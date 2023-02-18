@@ -1,0 +1,4 @@
+﻿  main.cpp
+C:\ProgrammingStuff\PixelSim\Pixel.h(70,18): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+C:\ProgrammingStuff\PixelSim\Pixel.h(71,18): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+  PixelSim.vcxproj -> C:\ProgrammingStuff\PixelSim\x64\Debug\PixelSim.exe
