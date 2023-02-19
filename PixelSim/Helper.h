@@ -8,10 +8,10 @@
 #include <iostream>
 
 int clampInt(int input, int min, int max) {
-	return input > max ? input = max : (input < min ? input = min : input);
+    return input > max ? input = max : (input < min ? input = min : input);
 }
 void clampInt(int* input, int min, int max) {
-	*input = *input > max ? *input = max : (*input < min ? *input = min : *input);
+    *input = *input > max ? *input = max : (*input < min ? *input = min : *input);
 }
 
 //code borrowed from LazyFoo

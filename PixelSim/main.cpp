@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <sstream>
 
 //The surface contained by the window
@@ -28,10 +29,14 @@ SDL_Renderer* gRenderer = NULL;
 //Current displayed texture
 SDL_Texture* gTexture = NULL;
 
+//Global font
+TTF_Font* gFont = NULL;
+
 SDL_Event gCurrentEvent;
-bool mouseDown;
 
 SDL_Point mPosition = SDL_Point();
+
+Uint32 mButton = NULL;
 
 #include "Pixel.h"
 #include "Graphics.h"
@@ -58,27 +63,43 @@ bool init()
         }
         else
         {
-            //Create renderer for window
-            gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED);
-            if (gRenderer == NULL)
+            //Initialize SDL_ttf
+            if (TTF_Init() == -1)
             {
-                printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
+                printf("SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError());
                 success = false;
             }
-            else
-            {
-                //Initialize renderer color
-                SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
-
-                //Initialize PNG loading
-                int imgFlags = IMG_INIT_PNG;
-                if (!(IMG_Init(imgFlags) & imgFlags))
+            else {
+                //Create renderer for window
+                gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED);
+                if (gRenderer == NULL)
                 {
-                    printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
+                    printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
                     success = false;
                 }
-                else {
-                    
+                else
+                {
+                    //Initialize renderer color
+                    SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
+
+                    //Load the font file
+                    gFont = TTF_OpenFont("calibri.ttf", 32);
+                    if (gFont == NULL)
+                    {
+                        printf("Failed to load font! SDL_ttf Error: %s\n", TTF_GetError());
+                        success = false;
+                    }
+
+                    //Initialize PNG loading
+                    int imgFlags = IMG_INIT_PNG;
+                    if (!(IMG_Init(imgFlags) & imgFlags))
+                    {
+                        printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
+                        success = false;
+                    }
+                    else {
+
+                    }
                 }
             }
         }
@@ -104,6 +125,7 @@ void close()
 
     //Quit SDL subsystems
     IMG_Quit();
+    TTF_Quit();
     SDL_Quit();
 }
 
@@ -142,18 +164,13 @@ int main(int argc, char* args[])
                     quit = true;
                 }
             }
-            mouseDown = SDL_GetMouseState(&mPosition.x, &mPosition.y);
-            int closestPixel = Pxl::GetClosestPixel(mPosition);
+            mButton = SDL_GetMouseState(&mPosition.x, &mPosition.y);
+            SDL_Point closestPixel = SDL_Point{ (int)floor(mPosition.x / PIXEL_SIZE), (int)floor(mPosition.y / PIXEL_SIZE) };
 
-            Pxl::UpdatePixels(&gCurrentEvent, closestPixel);
+            Pxl::UpdatePixels(mPosition, mButton, closestPixel);
 
             //Calculate and correct fps
-            /*float avgFPS = countedFrames / (fpsTimer.getTicks() / 1000.f);
-            if (avgFPS > 2000000)
-            {
-                avgFPS = 0;
-            }*/
-
+            float avgFPS = countedFrames / (fpsTimer.getTicks() / 1000.f);
             //std::cout << "Average Frames Per Second (With Cap) " << avgFPS << std::endl;
 
             //Clear screen
@@ -162,10 +179,11 @@ int main(int argc, char* args[])
 
             //Draw screen
             Gfx::LoadPixels(closestPixel);
+            Gfx::DrawFPScounter(avgFPS);
 
             //capping refresh rate stuff
             SDL_RenderPresent(gRenderer);
-            //countedFrames++;
+            countedFrames++;
 
             //If frame finished early
             int frameTicks = capTimer.getTicks();

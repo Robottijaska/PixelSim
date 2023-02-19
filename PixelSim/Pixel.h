@@ -24,7 +24,7 @@ namespace Pxl {
 		int colOff = 0;
 	};
 
-	Pixel Pixels[SCREEN_WIDTH * SCREEN_HEIGHT / PIXEL_SIZE];
+	Pixel Pixels[SCREEN_WIDTH / PIXEL_SIZE][SCREEN_HEIGHT / PIXEL_SIZE];
 
 	namespace types {
 		enum PixelTypesID {
@@ -59,31 +59,27 @@ namespace Pxl {
 		return PixelTypes[id];
 	}
 
-	SDL_Point PixelsGetCoordinates(int input) {
-		SDL_Point output = SDL_Point();
-		output.x = (input % screenWidthPxl) * PIXEL_SIZE;
-		output.y = (int)floor(input / static_cast<float>(screenWidthPxl))* PIXEL_SIZE;
-		return output;
+	void SetPixel(SDL_Point location, Pixel pixel) {
+		Pixels[location.x][location.y].Color = pixel.Color;
+		Pixels[location.x][location.y].AtomMass = pixel.AtomMass;
 	}
 
-	int GetClosestPixel(SDL_Point input) {
-		input.x = floor(input.x / (PIXEL_SIZE));
-		input.y = floor(input.y / (PIXEL_SIZE));
-		return input.x + input.y * screenWidthPxl;
-	}
-
-	void AddPixel(int location, Pixel pixel) {
-		Pixels[location].Color = pixel.Color;
-		Pixels[location].AtomMass = pixel.AtomMass;
-	}
-
-	void UpdatePixels(SDL_Event* Event, int closestPixel) {
-		if (mouseDown && SDL_BUTTON_LMASK)
+	void UpdatePixels(SDL_Point mPosition, Uint32 mButton, SDL_Point closestPixel) {
+		if (mButton)
 		{
-			SDL_GetMouseState(&mPosition.x, &mPosition.y);
 			clampInt(&mPosition.x, 0, SCREEN_WIDTH);
 			clampInt(&mPosition.y, 0, SCREEN_HEIGHT);
-			AddPixel(closestPixel, GetPixelType(types::OXYGEN));
+
+			switch (mButton) {
+				case SDL_BUTTON_LEFT:
+					SetPixel(closestPixel, GetPixelType(types::OXYGEN));
+					break;
+				case SDL_BUTTON_X1:
+					SetPixel(closestPixel, GetPixelType(types::VACUUM));
+					break;
+				default:
+					break;
+			}
 		}
 	}
 }
