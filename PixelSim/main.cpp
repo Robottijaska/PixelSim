@@ -35,11 +35,13 @@ TTF_Font* gFont = NULL;
 SDL_Event gCurrentEvent;
 
 SDL_Point mPosition = SDL_Point();
+SDL_Point mPositionOld = SDL_Point();
 
 Uint32 mButton = NULL;
 
 #include "Pixel.h"
 #include "Graphics.h"
+#include "Gui.h"
 
 bool init()
 {
@@ -97,9 +99,8 @@ bool init()
                         printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
                         success = false;
                     }
-                    else {
 
-                    }
+                    Gui::Guis.push_back(std::make_unique<Gui::Types::Menu>(SDL_Point{ SCREEN_WIDTH - 17 * 4, -34 * (4 - 2) }));
                 }
             }
         }
@@ -150,36 +151,70 @@ int main(int argc, char* args[])
         //Start counting frames per second
         int countedFrames = 0;
         fpsTimer.start();
+        SDL_Point closestPixel = SDL_Point{ 0, 0 };
+
+        Uint64 ticksNow = SDL_GetPerformanceCounter();
+        Uint64 ticksLast = 0;
+
+        Uint32 mTicksCount = 0;
+
         while (!quit)
         {
             //Start cap timer
             capTimer.start();
 
+            bool mouseClick = false;
             //Handle events on queue
             while (SDL_PollEvent(&gCurrentEvent) != 0)
             {
-                //User requests quit
-                if (gCurrentEvent.type == SDL_QUIT)
-                {
+                switch (gCurrentEvent.type) {
+
+                case SDL_QUIT:
                     quit = true;
+                    break;
+                case SDL_MOUSEBUTTONDOWN:
+                    mouseClick = !Gui::mouseInGui;
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    Gui::mouseInGui = false;
+                    break;
                 }
+
             }
+
+            mPositionOld = mPosition;
             mButton = SDL_GetMouseState(&mPosition.x, &mPosition.y);
-            SDL_Point closestPixel = SDL_Point{ (int)floor(mPosition.x / PIXEL_SIZE), (int)floor(mPosition.y / PIXEL_SIZE) };
+            clampInt(&mPosition.x, -1, SCREEN_WIDTH);
+            clampInt(&mPosition.y, -1, SCREEN_HEIGHT);
 
-            Pxl::UpdatePixels(mPosition, mButton, closestPixel);
-
-            //Calculate and correct fps
+            //Calculate fps
             float avgFPS = countedFrames / (fpsTimer.getTicks() / 1000.f);
-            //std::cout << "Average Frames Per Second (With Cap) " << avgFPS << std::endl;
 
+            //Calculate deltaTime 
+            ticksLast = ticksNow;
+            ticksNow = SDL_GetPerformanceCounter();
+            double deltaTime = deltaTime = ((ticksNow - ticksLast) * 60 / (double)SDL_GetPerformanceFrequency());
+
+            /* 0 if pixels should NOT be updated and mouse recognition should NOT be available
+            * 1 if pixels should be updated and mouse recognition should NOT be available
+            * 2 if pixels should be updated and mouse recognition should be available*/
+            int pxlState = 2;
+
+            pxlState = Gui::UpdateGuis(mouseClick, deltaTime);
+
+            if (pxlState != 0 && Gui::mouseInGui == false) {
+                if (pxlState != 1) { closestPixel = SDL_Point{ (int)floor(mPosition.x / PIXEL_SIZE), (int)floor(mPosition.y / PIXEL_SIZE) }; }
+                Pxl::UpdatePixels(mPosition, mPositionOld, mButton, mouseClick, pxlState);
+            }
             //Clear screen
             SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
             SDL_RenderClear(gRenderer);
 
             //Draw screen
-            Gfx::LoadPixels(closestPixel);
+            Pxl::LoadPixels(closestPixel, pxlState);
+            if (pxlState != 0) { Gfx::DrawCoordinates(closestPixel); }
             Gfx::DrawFPScounter(avgFPS);
+            Gui::DrawGuis();
 
             //capping refresh rate stuff
             SDL_RenderPresent(gRenderer);

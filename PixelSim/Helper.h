@@ -14,6 +14,20 @@ void clampInt(int* input, int min, int max) {
     *input = *input > max ? *input = max : (*input < min ? *input = min : *input);
 }
 
+struct Vector2 {
+    double x = 0;
+    double y = 0;
+};
+
+//distance between two points
+float findGLen(SDL_Point p1, SDL_Point p2) {
+    return (float)sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2));
+}
+
+SDL_Point findClosestPxl(SDL_Point p1) {
+    return SDL_Point{ (int)floor(p1.x / PIXEL_SIZE), (int)floor(p1.y / PIXEL_SIZE) };
+}
+
 //code borrowed from LazyFoo
 class LTimer
 {
@@ -146,4 +160,8 @@ bool LTimer::isPaused()
 {
     //Timer is running and paused
     return mPaused && mStarted;
+}
+
+bool isInsideRect(SDL_Rect Zone, SDL_Point Point) {
+    return (Point.x >= Zone.x && Point.x <= Zone.x + Zone.w) && (Point.y >= Zone.y && Point.y <= Zone.y + Zone.h);
 }
