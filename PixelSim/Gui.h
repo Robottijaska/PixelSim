@@ -208,6 +208,44 @@ namespace Gui {
 			//Screens
 			class MainScreen : public GuiMap {
 			private:
+				struct ClearAllButton : public GuiButton {
+					MainScreen* Parent;
+
+					ClearAllButton(MainScreen* parent) {
+						Parent = parent;
+
+						XOffSet = 0;
+						YOffSet = 0;
+
+						//makes invisible
+						useTexture = true;
+						Texture = NULL;
+						Zone = SDL_Rect{ 0,0,68,68 };
+					}
+
+					~ClearAllButton() {
+						Parent = nullptr;
+					}
+
+					void Update(bool mouseClick, double deltaTime) {
+						Zone.x = Parent->Parent->Zone.x + XOffSet;
+						Zone.y = Parent->Parent->Zone.y + YOffSet;
+
+						//if clicked
+						if (isInsideRect(Zone, mPosition) && mouseClick) {
+							mouseInGui = true;
+
+							for (int i = 0; i < Pxl::PIXELGRID_WIDTH; i++) {
+								for (int j = 0; j < Pxl::PIXELGRID_HEIGHT; j++) {
+									if (Pxl::Pixels[i][j].Name != "Vacuum") {
+										Pxl::SetPixel( SDL_Point{i, j}, Pxl::GetPixelType(Pxl::types::VACUUM));
+									}
+								}
+							}
+						}
+					}
+				};
+
 				struct ColorPickerButton : public GuiButton {
 					MainScreen* Parent;
 
@@ -215,7 +253,7 @@ namespace Gui {
 						Parent = parent;
 
 						XOffSet = 0;
-						YOffSet = 0;
+						YOffSet = 68;
 
 						//makes invisible
 						useTexture = true;
@@ -250,7 +288,7 @@ namespace Gui {
 						Parent = parent;
 
 						XOffSet = 0;
-						YOffSet = 68;
+						YOffSet = 68*2;
 						Color.a = 0;
 						useTexture = true;
 						Texture = NULL;
@@ -285,10 +323,10 @@ namespace Gui {
 						}
 						else {
 							if (isExtended) {
-								Parent->Parent->velocityY = -6.8;
+								Parent->Parent->velocityY = -13.6;
 							}
 							else {
-								Parent->Parent->velocityY = 6.8;
+								Parent->Parent->velocityY = 13.6;
 							}
 							moveSteps--;
 						}
@@ -304,6 +342,7 @@ namespace Gui {
 					//Initializing Buttons
 					Buttons.push_back(std::make_unique<DropdownButton>(this));
 					Buttons.push_back(std::make_unique<ColorPickerButton>(this));
+					Buttons.push_back(std::make_unique<ClearAllButton>(this));
 
 					useTexture = true;
 					Texture = Gfx::loadTexture("x64/Gfx/GUI/Menu/Menu.png");
@@ -325,7 +364,7 @@ namespace Gui {
 			Vector2 Pos{};
 		public:
 			Menu(SDL_Point startPos) {
-				Zone = SDL_Rect{ startPos.x, startPos.y, 17 * 4, 34 * 4 };
+				Zone = SDL_Rect{ startPos.x, startPos.y, 68, 68 * 3 };
 				Pos = Vector2{ (double)Zone.x, (double)Zone.y };
 
 				Maps.push_back(std::make_unique<MainScreen>(this));

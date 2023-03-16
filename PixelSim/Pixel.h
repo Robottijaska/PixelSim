@@ -26,6 +26,8 @@ namespace Pxl {
 	};
 
 	Pixel Pixels[SCREEN_WIDTH / PIXEL_SIZE][SCREEN_HEIGHT / PIXEL_SIZE];
+	const int PIXELGRID_WIDTH = SCREEN_WIDTH / PIXEL_SIZE;
+	const int PIXELGRID_HEIGHT = SCREEN_HEIGHT / PIXEL_SIZE;
 
 	namespace types {
 		enum PixelTypesID {

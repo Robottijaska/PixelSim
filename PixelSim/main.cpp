@@ -100,7 +100,7 @@ bool init()
                         success = false;
                     }
 
-                    Gui::Guis.push_back(std::make_unique<Gui::Types::Menu>(SDL_Point{ SCREEN_WIDTH - 17 * 4, -34 * (4 - 2) }));
+                    Gui::Guis.push_back(std::make_unique<Gui::Types::Menu>(SDL_Point{ SCREEN_WIDTH - 17 * 4, -68 * 2 }));
                 }
             }
         }
