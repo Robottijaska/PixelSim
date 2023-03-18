@@ -100,6 +100,15 @@ bool init()
                         success = false;
                     }
 
+                    for (int x = 0; x < Pxl::PIXELGRID_WIDTH; x++) {
+                        for (int y = 0; y < Pxl::PIXELGRID_HEIGHT; y++) {
+
+                            Pxl::Pixels[x][y] = Pxl::GetPixelType(Pxl::types::VACUUM);
+
+                        }
+                    }
+
+                    //adding menu gui
                     Gui::Guis.push_back(std::make_unique<Gui::Types::Menu>(SDL_Point{ SCREEN_WIDTH - 17 * 4, -68 * 2 }));
                 }
             }
@@ -141,6 +150,7 @@ int main(int argc, char* args[])
     {
         bool quit = false;
         bool continueMouse = false;
+        bool isPaused = false;
 
         //The frames per second timer
         LTimer fpsTimer;
@@ -169,17 +179,22 @@ int main(int argc, char* args[])
             {
                 switch (gCurrentEvent.type) {
 
-                case SDL_QUIT:
-                    quit = true;
-                    break;
-                case SDL_MOUSEBUTTONDOWN:
-                    mouseClick = !Gui::mouseInGui;
-                    break;
-                case SDL_MOUSEBUTTONUP:
-                    Gui::mouseInGui = false;
-                    break;
+                    case SDL_QUIT:
+                        quit = true;
+                        break;
+                    case SDL_MOUSEBUTTONDOWN:
+                        mouseClick = !Gui::mouseInGui;
+                        break;
+                    case SDL_MOUSEBUTTONUP:
+                        Gui::mouseInGui = false;
+                        break;
+                    case SDL_KEYDOWN:
+                        switch (gCurrentEvent.key.keysym.sym) {
+                            case SDLK_F1:
+                                isPaused = !isPaused;
+                                break;
+                        }
                 }
-
             }
 
             mPositionOld = mPosition;
@@ -195,6 +210,7 @@ int main(int argc, char* args[])
             ticksNow = SDL_GetPerformanceCounter();
             double deltaTime = deltaTime = ((ticksNow - ticksLast) * 60 / (double)SDL_GetPerformanceFrequency());
 
+            //---UPDATE---
             /* 0 if pixels should NOT be updated and mouse recognition should NOT be available
             * 1 if pixels should be updated and mouse recognition should NOT be available
             * 2 if pixels should be updated and mouse recognition should be available*/
@@ -204,8 +220,10 @@ int main(int argc, char* args[])
 
             if (pxlState != 0 && Gui::mouseInGui == false) {
                 if (pxlState != 1) { closestPixel = SDL_Point{ (int)floor(mPosition.x / PIXEL_SIZE), (int)floor(mPosition.y / PIXEL_SIZE) }; }
-                Pxl::UpdatePixels(mPosition, mPositionOld, mButton, mouseClick, pxlState);
+                Pxl::UpdatePixels(isPaused, mPosition, mPositionOld, mButton, mouseClick, pxlState);
             }
+
+            //---DRAW---
             //Clear screen
             SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
             SDL_RenderClear(gRenderer);
@@ -215,6 +233,11 @@ int main(int argc, char* args[])
             if (pxlState != 0) { Gfx::DrawCoordinates(closestPixel); }
             Gfx::DrawFPScounter(avgFPS);
             Gui::DrawGuis();
+
+            if (isPaused) {
+                SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, 100);
+                SDL_RenderCopy(gRenderer, Gfx::loadTexture("x64/Gfx/Pause.png"), NULL, new SDL_Rect{SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT / 2 - 200, 400, 400});
+            }
 
             //capping refresh rate stuff
             SDL_RenderPresent(gRenderer);

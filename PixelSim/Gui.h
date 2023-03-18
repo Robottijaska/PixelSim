@@ -74,11 +74,9 @@ namespace Gui {
 		virtual void Update(bool mouseClick, double deltaTime) {}
 	};
 
-	const int GUIS_LENGTH = 1;
 	std::vector<std::unique_ptr<BaseGUI>> Guis;
 
 	namespace Types {
-
 		//CLASS: PIXELPICKER;
 		class PixelPicker : public BaseGUI {
 		private:
@@ -277,18 +275,24 @@ namespace Gui {
 					}
 				};
 
-				//reveals the buttons on the gui - last button
 				struct DropdownButton : public GuiButton {
 					MainScreen* Parent;
 
 					bool isExtended = false;
 					bool isMoving = false;
 
+					int startY;
+					int endY;
+
 					DropdownButton(MainScreen* parent) {
 						Parent = parent;
 
 						XOffSet = 0;
 						YOffSet = 68*2;
+
+						startY = Parent->Parent->Zone.y;
+						endY = startY + Parent->Parent->Zone.h - 68;
+
 						Color.a = 0;
 						useTexture = true;
 						Texture = NULL;
@@ -299,7 +303,6 @@ namespace Gui {
 						Parent = nullptr;
 					}
 
-					double moveSteps = 0;
 					void Update(bool mouseClick, double deltaTime) {
 						Zone.x = Parent->Parent->Zone.x + XOffSet;
 						Zone.y = Parent->Parent->Zone.y + YOffSet;
@@ -310,25 +313,33 @@ namespace Gui {
 							//checks whether the gui is between move cycles
 							if (!isMoving) {
 								isMoving = true;
-								moveSteps = 10;
-								Parent->Parent->velocityY = 0;
+								Parent->velocityY = 0;
 							}
 						}
-						if (moveSteps <= 0) {
-							if (isMoving) {
-								Parent->Parent->velocityY = 0;
-								isExtended = !isExtended;
-								isMoving = false;
-							}
-						}
-						else {
+
+						if (isMoving) {
 							if (isExtended) {
-								Parent->Parent->velocityY = -13.6;
+								if (Parent->Parent->Zone.y - 10 < startY) {
+									Parent->Parent->Zone.y = startY;
+									Parent->velocityY = 0;
+									isExtended = false;
+									isMoving = false;
+								}
+								else {
+									Parent->velocityY = -10;
+								}
 							}
 							else {
-								Parent->Parent->velocityY = 13.6;
+								if (Parent->Parent->Zone.y + 10 > endY) {
+									Parent->Parent->Zone.y = endY;
+									Parent->velocityY = 0;
+									isExtended = true;
+									isMoving = false;
+								}
+								else {
+									Parent->velocityY = 10;
+								}
 							}
-							moveSteps--;
 						}
 					}
 				};
@@ -336,6 +347,7 @@ namespace Gui {
 				Menu* Parent;
 
 			public:
+				double velocityY = 0;
 				MainScreen(Menu* parent) {
 					Parent = parent;
 
@@ -357,15 +369,12 @@ namespace Gui {
 					for (int i = 0; i < Buttons.size(); i++) {
 						Buttons[i]->Update(mouseClick, deltaTime);
 					}
+					Parent->Zone.y += (int)(velocityY * deltaTime);
 				}
 			};
-			double velocityY = 0;
-
-			Vector2 Pos{};
 		public:
 			Menu(SDL_Point startPos) {
 				Zone = SDL_Rect{ startPos.x, startPos.y, 68, 68 * 3 };
-				Pos = Vector2{ (double)Zone.x, (double)Zone.y };
 
 				Maps.push_back(std::make_unique<MainScreen>(this));
 
@@ -374,8 +383,6 @@ namespace Gui {
 
 			void Update(bool mouseClick, double deltaTime) {
 				Maps[currentMap]->Update(mouseClick, deltaTime);
-				Pos.y += velocityY;
-				Zone.y += (int)velocityY;
 			}
 		};
 	}

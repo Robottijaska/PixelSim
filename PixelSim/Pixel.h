@@ -14,12 +14,14 @@ namespace Pxl {
 	public:
 		//type related
 
+		int ID = 0;
 		std::string Name;
 		SDL_Color Color = SDL_Color{ 50,50,50,255 };
 		float AtomMass = 0.0f;
 
 		//non-type related
 
+		bool Updated = false;
 		int Moles = 0;
 		int Temperature = 0;
 		int colOff = 0;
@@ -41,6 +43,7 @@ namespace Pxl {
 	Pixel PixelTypes[3] = {
 		//VACUUM
 		Pixel{
+			types::VACUUM,
 			"Vacuum",
 			SDL_Color{ 50,50,50 },
 			0.0f
@@ -48,6 +51,7 @@ namespace Pxl {
 
 		//OXYGEN
 		Pixel{
+			types::OXYGEN,
 			"Oxygen",
 			SDL_Color{ 170,170,200 },
 			16.0f
@@ -55,6 +59,7 @@ namespace Pxl {
 
 		//SAND
 		Pixel{
+			types::SAND,
 			"Sand",
 			SDL_Color{ 200,200,170 },
 			60.1f
@@ -66,13 +71,34 @@ namespace Pxl {
 	}
 
 	void SetPixel(SDL_Point location, Pixel pixel) {
+		Pixels[location.x][location.y].ID = pixel.ID;
+		Pixels[location.x][location.y].Name = pixel.Name;
 		Pixels[location.x][location.y].Color = pixel.Color;
 		Pixels[location.x][location.y].AtomMass = pixel.AtomMass;
 	}
 
+	//swaps two pixels from p1 to p2
+	bool SwapPixels(SDL_Point p1, SDL_Point p2) {
+		if ( !(p2.y >= PIXELGRID_HEIGHT || p2.y < 0 || p2.x >= PIXELGRID_WIDTH || p2.x < 0) ) {
+			if (Pixels[p1.x][p1.y].ID != Pixels[p2.x][p2.y].ID) {
+				Pixel tempPixel = Pixels[p1.x][p1.y];
+
+				Pixels[p1.x][p1.y] = Pixels[p2.x][p2.y];
+				Pixels[p2.x][p2.y] = tempPixel;
+
+				return true;
+			}
+		}
+		return false;
+	}
+
 	Pxl::Pixel selectedPixel = Pxl::GetPixelType(Pxl::types::VACUUM);
 
-	void UpdatePixels(SDL_Point mPosition, SDL_Point mPositionOld, Uint32 mButton, bool mouseClick, int pxlState) {
+	//slows down pixels
+	unsigned int updateTimer = 1;
+
+	void UpdatePixels(bool isPaused, SDL_Point mPosition, SDL_Point mPositionOld, Uint32 mButton, bool mouseClick, int pxlState) {
+		//placing pixels
 		if (mButton)
 		{
 			if (pxlState == 2) {
@@ -96,6 +122,33 @@ namespace Pxl {
 						pxlTurtle.y += PIXEL_SIZE * sin(dir);
 					}
 				}
+			}
+		}
+
+		//pixel updating loop
+		if (!isPaused) {
+			updateTimer--;
+			if (updateTimer == 0) {
+
+				for (int x = 0; x < PIXELGRID_WIDTH; x++) {
+					for (int y = 0; y < PIXELGRID_HEIGHT; y++) {
+
+						Pixel currentPixel = Pixels[x][y];
+
+						if (!currentPixel.Updated && currentPixel.ID != types::VACUUM) {
+							Pixels[x][y + 1].Updated = SwapPixels(SDL_Point{ x,y }, SDL_Point{ x,y + 1 });
+						}
+					}
+				}
+
+				for (int x = 0; x < PIXELGRID_WIDTH; x++) {
+					for (int y = 0; y < PIXELGRID_HEIGHT; y++) {
+						Pixels[x][y].Updated = false;
+					}
+				}
+				//end
+				updateTimer = 1;
+
 			}
 		}
 	}
