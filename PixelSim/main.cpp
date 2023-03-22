@@ -84,6 +84,8 @@ bool init()
                     //Initialize renderer color
                     SDL_SetRenderDrawColor(gRenderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
+
+
                     //Load the font file
                     gFont = TTF_OpenFont("calibri.ttf", 32);
                     if (gFont == NULL)
@@ -168,6 +170,11 @@ int main(int argc, char* args[])
 
         Uint32 mTicksCount = 0;
 
+        //pause button's texture settings
+        SDL_Texture* pauseTexture = Gfx::loadTexture("x64/Gfx/Pause.png");
+        SDL_SetTextureBlendMode(pauseTexture, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureAlphaMod(pauseTexture, 100);
+
         while (!quit)
         {
             //Start cap timer
@@ -236,7 +243,7 @@ int main(int argc, char* args[])
 
             if (isPaused) {
                 SDL_SetRenderDrawColor(gRenderer, 255, 255, 255, 100);
-                SDL_RenderCopy(gRenderer, Gfx::loadTexture("x64/Gfx/Pause.png"), NULL, new SDL_Rect{SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT / 2 - 200, 400, 400});
+                SDL_RenderCopy(gRenderer, pauseTexture, NULL, new SDL_Rect{SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT / 2 - 200, 400, 400});
             }
 
             //capping refresh rate stuff

@@ -169,7 +169,7 @@ namespace Gui {
 					Buttons.push_back(std::make_unique<CloseButton>(this));
 
 					//pixels
-					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::GetPixelType(Pxl::types::OXYGEN), SDL_Point{ 28,28 }));
+					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::GetPixelType(Pxl::types::WATER), SDL_Point{ 28,28 }));
 					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::GetPixelType(Pxl::types::SAND), SDL_Point{ 28 * 4,28 }));
 				}
 
