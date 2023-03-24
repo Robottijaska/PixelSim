@@ -15,7 +15,7 @@ const int SCREEN_HEIGHT = 480 * 2;
 const int SCREEN_FPS = 60;
 const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
 
-const int PIXEL_SIZE = 8 * 2;
+const int PIXEL_SIZE = 8 * 1;
 
 const int screenWidthPxl = SCREEN_WIDTH / PIXEL_SIZE;
 const int screenHeightPxl = SCREEN_HEIGHT / PIXEL_SIZE;
@@ -102,12 +102,8 @@ bool init()
                         success = false;
                     }
 
-                    for (int x = 0; x < Pxl::PIXELGRID_WIDTH; x++) {
-                        for (int y = 0; y < Pxl::PIXELGRID_HEIGHT; y++) {
-
-                            Pxl::Pixels[x][y] = Pxl::GetPixelType(Pxl::types::VACUUM);
-
-                        }
+                    for (int i = 0; i < Pxl::PIXELGRID_SIZE; i++) {
+                        Pxl::SetPixel(i, Pxl::Pixels[Pxl::types::VACUUM]);
                     }
 
                     //adding menu gui

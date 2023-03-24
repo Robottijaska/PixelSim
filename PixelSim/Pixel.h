@@ -7,14 +7,23 @@
 #include <SDL_image.h>
 #include <iostream>
 
+
+#include <algorithm>
+
 #include "Helper.h"
 
 namespace Pxl {
+
+	const size_t PIXELGRID_SIZE = SCREEN_WIDTH * SCREEN_HEIGHT / PIXEL_SIZE;
+	const size_t PIXELGRID_WIDTH = SCREEN_WIDTH / PIXEL_SIZE;
+	const size_t PIXELGRID_HEIGHT = SCREEN_HEIGHT / PIXEL_SIZE;
+
 	namespace types {
 		enum PixelTypesID {
 			VACUUM,
 			WATER,
 			SAND,
+			STONE,
 		};
 
 		enum Phases {
@@ -25,7 +34,7 @@ namespace Pxl {
 		};
 	}
 
-	struct Pixel {
+	class Pixel {
 	public:
 		//type related
 
@@ -47,12 +56,8 @@ namespace Pxl {
 		}
 	};
 
-	Pixel Pixels[SCREEN_WIDTH / PIXEL_SIZE][SCREEN_HEIGHT / PIXEL_SIZE];
-	const int PIXELGRID_WIDTH = SCREEN_WIDTH / PIXEL_SIZE;
-	const int PIXELGRID_HEIGHT = SCREEN_HEIGHT / PIXEL_SIZE;
-
 	//---PIXEL TYPES---
-	Pixel PixelTypes[3] = {
+	const Pixel PixelTypes[4] = {
 		//VACUUM
 		Pixel{
 			types::VACUUM,
@@ -78,37 +83,130 @@ namespace Pxl {
 			60.1f,
 			types::SOLID_POWDER
 		},
+
+		//Stone
+		Pixel{
+			types::STONE,
+			"Stone",
+			SDL_Color{ 100,100,130 },
+			0.0f,
+			types::SOLID_STATIC
+		},
 	};
 
-	Pixel GetPixelType(int id) {
-		return PixelTypes[id];
+	Pixel Pixels[PIXELGRID_SIZE];
+
+	const Pixel& GetPixel(size_t pos){ return Pixels[pos]; }
+	const Pixel& GetPixel(size_t x, size_t y) { return Pixels[x + y * PIXELGRID_WIDTH]; }
+
+	bool InBounds(size_t x, size_t y) { return x < PIXELGRID_WIDTH && y < PIXELGRID_HEIGHT; }
+	bool IsEmpty(size_t x, size_t y) { return InBounds(x, y) && GetPixel(x, y).ID == types::VACUUM; }
+
+	size_t GetIndex(size_t x, size_t y) { return x + y * PIXELGRID_WIDTH; }
+
+	bool IsMoveableTo(size_t xSrc, size_t ySrc, size_t x, size_t y) { 
+		return GetPixel(x,y).Phase != types::SOLID_STATIC && InBounds(x, y) && Pixels[GetIndex(xSrc, ySrc)].GetMass() > Pixels[GetIndex(x, y)].GetMass(); 
 	}
 
-	void SetPixel(SDL_Point location, Pixel pixel) {
-		Pixels[location.x][location.y].ID = pixel.ID;
-		Pixels[location.x][location.y].Name = pixel.Name;
-		Pixels[location.x][location.y].Color = pixel.Color;
-		Pixels[location.x][location.y].AtomMass = pixel.AtomMass;
-		Pixels[location.x][location.y].Phase = pixel.Phase;
+	size_t GetClosestPixel(size_t x, size_t y) { return GetIndex( (size_t)floor(x / PIXEL_SIZE), (size_t)floor(y / PIXEL_SIZE)); }
+
+	void SetPixel(size_t x, size_t y, const Pixel& pixel) { Pixels[GetIndex(x, y)] = pixel; }
+	void SetPixel(size_t index, const Pixel& pixel) { Pixels[index] = pixel; }
+
+	std::vector<std::pair<size_t, size_t>> PixelChangesBuffer; // (1)ending pixel <- (2)starting pixel
+
+	void TranslatePixel(size_t destination, size_t start) { 
+		PixelChangesBuffer.emplace_back(destination, start); 
 	}
 
-	//swaps two pixels from p1 to p2
-	bool SwapPixels(SDL_Point p1, SDL_Point p2) {
-		if (Pixels[p1.x][p1.y].GetMass() > Pixels[p2.x][p2.y].GetMass()) {
-			Pixel tempPixel = Pixels[p1.x][p1.y];
-
-			SetPixel(SDL_Point{ p1.x , p1.y }, Pixels[p2.x][p2.y]);
-			SetPixel(SDL_Point{ p2.x , p2.y }, tempPixel);
-
-			return true;
+	void CommitPixels() {
+		//ensures that the queried movement has not already been requestedS
+		for (size_t i = 0; i < PixelChangesBuffer.size(); i++) {
+			if (Pixels[PixelChangesBuffer[i].first].GetMass() >= Pixels[PixelChangesBuffer[i].second].GetMass()) {
+				PixelChangesBuffer[i] = PixelChangesBuffer.back(); PixelChangesBuffer.pop_back();
+				i--;
+			}
 		}
-		return false;
+
+		std::sort(PixelChangesBuffer.begin(), PixelChangesBuffer.end(),
+			[](auto& a, auto& b) { return a.first < b.first; }
+		);
+
+		// pick random source for each destination
+
+		size_t iprev = 0;
+
+		PixelChangesBuffer.emplace_back(-1, -1); // to catch final move
+
+		for (size_t i = 0; i < PixelChangesBuffer.size() - 1; i++) {
+			if (PixelChangesBuffer[i + 1].first != PixelChangesBuffer[i].first) {
+				size_t rand = iprev + (size_t)randInt(i - iprev);
+
+				size_t dst = PixelChangesBuffer[rand].first;
+				size_t src = PixelChangesBuffer[rand].second;
+
+				Pixel keptPixel = Pixels[dst];
+				Pixels[dst] = Pixels[src];
+				Pixels[src] = keptPixel;
+
+				iprev = i + 1;
+			}
+		}
+
+		PixelChangesBuffer.clear();
 	}
 
-	Pxl::Pixel selectedPixel = Pxl::GetPixelType(Pxl::types::VACUUM);
+	Pixel selectedPixel = PixelTypes[types::VACUUM];
 
 	//slows down pixels
-	unsigned int updateTimer = 1;
+
+	bool MoveDown(
+		size_t x, size_t y,
+		const Pixel& cell)
+	{
+		bool down = IsMoveableTo(x,y, x, y + 1);
+		if (down) {
+			TranslatePixel(GetIndex(x, y + 1), GetIndex(x, y));
+		}
+
+		return down;
+	}
+
+	bool MoveDownSide(
+		size_t x, size_t y,
+		const Pixel& cell)
+	{
+		bool downLeft = IsMoveableTo(x,y, x - 1, y + 1);
+		bool downRight = IsMoveableTo(x,y, x + 1, y + 1);
+
+		if (downLeft && downRight) {
+			downLeft = randInt(1)-1 == 0;
+			downRight = !downLeft;
+		}
+
+		if (downLeft)  TranslatePixel(GetIndex(x - 1, y + 1), GetIndex(x, y));
+		else if (downRight) TranslatePixel(GetIndex(x + 1, y + 1), GetIndex(x, y));
+
+		return downLeft || downRight;
+	}
+
+	bool MoveSide(
+		size_t x, size_t y,
+		const Pixel& cell)
+	{
+		bool left = IsMoveableTo(x,y, x - 1, y);
+		bool right = IsMoveableTo(x,y, x + 1, y);
+
+		if (left && right) {
+			left = randInt(2) - 1 > 0;
+			right = !left;
+		}
+
+		if (left)  TranslatePixel(GetIndex(x - 1, y), GetIndex(x, y));
+		else if (right) TranslatePixel(GetIndex(x + 1, y), GetIndex(x, y));
+
+		return left || right;
+	}
 
 	void UpdatePixels(bool isPaused, SDL_Point mPosition, SDL_Point mPositionOld, Uint32 mButton, bool mouseClick, int pxlState) {
 		//placing pixels
@@ -122,10 +220,10 @@ namespace Pxl {
 						if (!(pxlTurtle.y >= SCREEN_HEIGHT - 1 || pxlTurtle.x >= SCREEN_WIDTH - 1)) {
 							switch (mButton) {
 							case SDL_BUTTON_LEFT:
-								SetPixel(findClosestPxl(SDL_Point{ (int)pxlTurtle.x, (int)pxlTurtle.y }), selectedPixel);
+								SetPixel( GetClosestPixel((size_t)pxlTurtle.x, (size_t)pxlTurtle.y), selectedPixel);
 								break;
 							case SDL_BUTTON_X1:
-								SetPixel(findClosestPxl(SDL_Point{ (int)pxlTurtle.x, (int)pxlTurtle.y }), GetPixelType(types::VACUUM));
+								SetPixel(GetClosestPixel((size_t)pxlTurtle.x, (size_t)pxlTurtle.y), Pixels[types::VACUUM]);
 								break;
 							default:
 								break;
@@ -141,28 +239,20 @@ namespace Pxl {
 		//pixel updating loop
 		if (!isPaused) {
 			//gravity updates
-			for (int x = 0; x != PIXELGRID_WIDTH; x++) {
-				for (int y = 0; y != PIXELGRID_HEIGHT; y++) {
-					Pixel currentPixel = Pixels[x][y];
-					if (currentPixel.ID != types::VACUUM && !currentPixel.Updated) {
-						if (currentPixel.Phase != types::SOLID_STATIC) {
-							if (y + 1 < PIXELGRID_HEIGHT && SwapPixels(SDL_Point{ x,y }, SDL_Point{ x,y + 1 })) { Pixels[x][y+1].Updated = true; }
-							else if ( (y + 1 < PIXELGRID_HEIGHT && x + 1 < PIXELGRID_WIDTH) && SwapPixels(SDL_Point{ x,y }, SDL_Point{ x + 1,y + 1 })) { Pixels[x + 1][y + 1].Updated = true; }
-							else if ( (y + 1 < PIXELGRID_HEIGHT && x - 1 > -1) && SwapPixels(SDL_Point{ x,y }, SDL_Point{ x - 1,y + 1 })) { Pixels[x - 1][y + 1].Updated = true; }
-							else if (currentPixel.Phase != types::SOLID_POWDER) {
-								if (x + 1 < PIXELGRID_WIDTH && SwapPixels(SDL_Point{ x,y }, SDL_Point{ x + 1,y})) { Pixels[x + 1][y].Updated = true; }
-								else if (x - 1 > -1 && SwapPixels(SDL_Point{ x,y }, SDL_Point{ x - 1,y })) { Pixels[x - 1][y].Updated = true; }
-							}
-						}
+			for (int x = 0; x != PIXELGRID_WIDTH; x++)
+			for (int y = 0; y != PIXELGRID_HEIGHT; y++) {
+				const Pixel& currentPixel = GetPixel(x,y);
+				if (currentPixel.ID != types::VACUUM && currentPixel.Phase != types::SOLID_STATIC) {
+					if (MoveDown(x, y, currentPixel)){}
+					else if (MoveDownSide(x, y, currentPixel)) {}
+					else if (currentPixel.Phase != types::SOLID_POWDER) {
+						MoveSide(x, y, currentPixel);
 					}
 				}
 			}
-			for (int x = 0; x < PIXELGRID_WIDTH; x++) {
-				for (int y = 0; y < PIXELGRID_HEIGHT; y++) {
-					Pixels[x][y].Updated = false;
-				}
-			}
 		}
+
+		CommitPixels();
 	}
 
 	void LoadPixels(SDL_Point closestPixel, int pxlState) {
@@ -173,7 +263,7 @@ namespace Pxl {
 			for (int i = 0; i < SCREEN_WIDTH / PIXEL_SIZE; i++) {
 				for (int j = 0; j < SCREEN_HEIGHT / PIXEL_SIZE; j++) {
 					SDL_Rect newSquare = SDL_Rect{ i * PIXEL_SIZE, j * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE };
-					SDL_Color targetCol = Pxl::Pixels[i][j].Color;
+					SDL_Color targetCol = GetPixel(i, j).Color;
 					SDL_SetRenderDrawColor(gRenderer, clampInt(targetCol.r - 25, 0, 254), clampInt(targetCol.g - 25, 0, 254), clampInt(targetCol.b - 25, 0, 254), targetCol.a);
 					SDL_RenderFillRect(gRenderer, &newSquare);
 				}
@@ -183,7 +273,7 @@ namespace Pxl {
 			for (int i = 0; i < SCREEN_WIDTH / PIXEL_SIZE; i++) {
 				for (int j = 0; j < SCREEN_HEIGHT / PIXEL_SIZE; j++) {
 					SDL_Rect newSquare = SDL_Rect{ i * PIXEL_SIZE, j * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE };
-					SDL_Color targetCol = Pxl::Pixels[i][j].Color;
+					SDL_Color targetCol = GetPixel(i, j).Color;
 					SDL_SetRenderDrawColor(gRenderer, targetCol.r, targetCol.g, targetCol.b, targetCol.a);
 					SDL_RenderFillRect(gRenderer, &newSquare);
 				}
@@ -191,7 +281,7 @@ namespace Pxl {
 			if (pxlState == 2) {
 				//closest pixel to mouse is brighter
 				SDL_Rect newSquare = SDL_Rect{ closestPixel.x, closestPixel.y, PIXEL_SIZE, PIXEL_SIZE };
-				SDL_Color targetCol = Pxl::Pixels[newSquare.x][newSquare.y].Color;
+				SDL_Color targetCol = GetPixel(closestPixel.x, closestPixel.y).Color;
 				newSquare.x *= PIXEL_SIZE;
 				newSquare.y *= PIXEL_SIZE;
 				SDL_SetRenderDrawColor(gRenderer, clampInt(targetCol.r + 50, 0, 254), clampInt(targetCol.g + 50, 0, 254), clampInt(targetCol.b + 50, 0, 254), targetCol.a);

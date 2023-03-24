@@ -7,6 +7,18 @@
 #include <SDL_image.h>
 #include <iostream>
 
+int randInt(int max)
+{
+    if (max < 0) {
+        return -(rand() % (abs(max) + 1));
+    }
+    return rand() % (max + 1);
+}
+int randInt(size_t max)
+{
+    return rand() % (max + 1);
+}
+
 int clampInt(int input, int min, int max) {
     return input > max ? input = max : (input < min ? input = min : input);
 }

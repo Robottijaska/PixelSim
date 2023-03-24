@@ -117,6 +117,8 @@ namespace Gui {
 
 					Pxl::Pixel Pixel;
 
+					SDL_Color TtfColor;
+
 					PixelButton(MainScreen* parent, Pxl::Pixel pixel, SDL_Point offset) {
 						Parent = parent;
 						Pixel = pixel;
@@ -124,12 +126,17 @@ namespace Gui {
 						useTexture = false;
 						Color = pixel.Color;
 
+						float avgColor = (float)((int)pixel.Color.r + (int)pixel.Color.b + (int)pixel.Color.g) / 3;
+						avgColor = 255 - avgColor;
+
+						TtfColor = SDL_Color{ (Uint8)avgColor, (Uint8)avgColor, (Uint8)avgColor };
+
 						Zone = SDL_Rect{ offset.x + Parent->Parent->Zone.x, offset.y + Parent->Parent->Zone.y, 7 * 8, 7 * 8 };
 					}
 
 					void TtfName() {
 						std::string display = Pixel.Name;
-						SDL_Color textColor = { 100, 100, 100, 0 };
+						SDL_Color textColor = TtfColor;
 						SDL_Surface* textSurface = TTF_RenderText_Solid(gFont, display.c_str(), textColor);
 						SDL_Texture* text = SDL_CreateTextureFromSurface(gRenderer, textSurface);
 						int text_width = (int)((double)textSurface->w * ((double)Zone.w / (double)textSurface->w));
@@ -169,8 +176,9 @@ namespace Gui {
 					Buttons.push_back(std::make_unique<CloseButton>(this));
 
 					//pixels
-					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::GetPixelType(Pxl::types::WATER), SDL_Point{ 28,28 }));
-					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::GetPixelType(Pxl::types::SAND), SDL_Point{ 28 * 4,28 }));
+					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::PixelTypes[Pxl::types::WATER], SDL_Point{ 28,28 }));
+					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::PixelTypes[Pxl::types::SAND], SDL_Point{ 28 * 4,28 }));
+					Buttons.push_back(std::make_unique<PixelButton>(this, Pxl::PixelTypes[Pxl::types::STONE], SDL_Point{ 28 * 7,28 }));
 				}
 
 				~MainScreen() {
@@ -233,11 +241,9 @@ namespace Gui {
 						if (isInsideRect(Zone, mPosition) && mouseClick) {
 							mouseInGui = true;
 
-							for (int i = 0; i < Pxl::PIXELGRID_WIDTH; i++) {
-								for (int j = 0; j < Pxl::PIXELGRID_HEIGHT; j++) {
-									if (Pxl::Pixels[i][j].Name != "Vacuum") {
-										Pxl::SetPixel( SDL_Point{i, j}, Pxl::GetPixelType(Pxl::types::VACUUM));
-									}
+							for (int i = 0; i < Pxl::PIXELGRID_SIZE; i++) {
+								if (Pxl::GetPixel(i).Name != "Vacuum") {
+									Pxl::SetPixel( i, Pxl::PixelTypes[Pxl::types::VACUUM]);
 								}
 							}
 						}
