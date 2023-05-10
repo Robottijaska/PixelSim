@@ -1,9 +1,0 @@
-﻿  main.cpp
-C:\ProgrammingStuff\PixelSim\Pixel.h(70,18): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
-C:\ProgrammingStuff\PixelSim\Pixel.h(71,18): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
-  Generating code
-  1 of 18 functions ( 5.6%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    0 functions had inline decision re-evaluated but remain unchanged
-  Finished generating code
-  PixelSim.vcxproj -> C:\ProgrammingStuff\PixelSim\x64\Release\PixelSim.exe
