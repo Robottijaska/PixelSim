@@ -47,7 +47,8 @@ namespace Pxl {
 
 		int Phase = types::GAS;
 		bool Updated = false;
-		int Moles = 1;
+		float Moles = 0;
+		Vector2 Velocity = {0,0};
 		int Temperature = 0;
 		int colOff = 0;
 
@@ -94,60 +95,148 @@ namespace Pxl {
 		},
 	};
 
+	enum class PixelMoveTypes : size_t {
+		SWAP,
+		FLOOD,
+		TRUEFLOOD,
+		INJECT
+	};
+
 	Pixel Pixels[PIXELGRID_SIZE];
 
-	const Pixel& GetPixel(size_t pos){ return Pixels[pos]; }
+	const Pixel& GetPixel(size_t pos) { return Pixels[pos]; }
 	const Pixel& GetPixel(size_t x, size_t y) { return Pixels[x + y * PIXELGRID_WIDTH]; }
 
-	bool InBounds(size_t x, size_t y) { return x < PIXELGRID_WIDTH && y < PIXELGRID_HEIGHT; }
+	bool InBounds(size_t x, size_t y) { return x < PIXELGRID_WIDTH&& y < PIXELGRID_HEIGHT; }
 	bool IsEmpty(size_t x, size_t y) { return InBounds(x, y) && GetPixel(x, y).ID == types::VACUUM; }
 
 	size_t GetIndex(size_t x, size_t y) { return x + y * PIXELGRID_WIDTH; }
 
-	bool IsMoveableTo(size_t xSrc, size_t ySrc, size_t x, size_t y) { 
-		return GetPixel(x,y).Phase != types::SOLID_STATIC && InBounds(x, y) && Pixels[GetIndex(xSrc, ySrc)].GetMass() > Pixels[GetIndex(x, y)].GetMass(); 
+	bool IsMoveableTo(size_t xSrc, size_t ySrc, size_t x, size_t y, size_t type) {
+		if (type == (size_t)PixelMoveTypes::SWAP) {
+			return GetPixel(x, y).Phase != types::SOLID_STATIC &&
+				InBounds(x, y) &&
+				Pixels[GetIndex(xSrc, ySrc)].GetMass() > Pixels[GetIndex(x, y)].GetMass()
+				;
+		}
+		else if (type == (size_t)PixelMoveTypes::FLOOD || type == (size_t)PixelMoveTypes::TRUEFLOOD) {
+			return InBounds(x, y) &&
+				(GetPixel(x, y).ID == GetPixel(xSrc, ySrc).ID || GetPixel(x, y).ID == types::VACUUM) &&
+				GetPixel(x, y).Moles < 1 //1 is temporary, it represents moles# a pixel can hold
+				;
+		}
+		else if (type == (size_t)PixelMoveTypes::INJECT) {
+			return InBounds(x, y) &&
+				GetPixel(x, y).ID == GetPixel(xSrc, ySrc).ID
+				;
+		}
 	}
 
-	size_t GetClosestPixel(size_t x, size_t y) { return GetIndex( (size_t)floor(x / PIXEL_SIZE), (size_t)floor(y / PIXEL_SIZE)); }
+	size_t GetClosestPixel(size_t x, size_t y) { return GetIndex((size_t)floor(x / PIXEL_SIZE), (size_t)floor(y / PIXEL_SIZE)); }
 
 	void SetPixel(size_t x, size_t y, const Pixel& pixel) { Pixels[GetIndex(x, y)] = pixel; }
 	void SetPixel(size_t index, const Pixel& pixel) { Pixels[index] = pixel; }
 
-	std::vector<std::pair<size_t, size_t>> PixelChangesBuffer; // (1)ending pixel <- (2)starting pixel
-
-	void TranslatePixel(size_t destination, size_t start) { 
-		PixelChangesBuffer.emplace_back(destination, start); 
-	}
+	struct PixelMoveRequest {
+		size_t StartIndex;
+		size_t EndIndex;
+		size_t Type;
+	};
+	std::vector<PixelMoveRequest> PixelChangesBuffer; // (1)ending pixel <- (2)starting pixel
 
 	void CommitPixels() {
-		//ensures that the queried movement has not already been requestedS
-		for (size_t i = 0; i < PixelChangesBuffer.size(); i++) {
-			if (Pixels[PixelChangesBuffer[i].first].GetMass() >= Pixels[PixelChangesBuffer[i].second].GetMass()) {
-				PixelChangesBuffer[i] = PixelChangesBuffer.back(); PixelChangesBuffer.pop_back();
-				i--;
+
+		std::sort(PixelChangesBuffer.begin(), PixelChangesBuffer.end(),
+			[](auto& a, auto& b) { return a.EndIndex < b.EndIndex; }
+		);
+
+		//if multiple movements terminate at the same location, choose a random one to keep and delete the rest
+		size_t similarChangesIndex = 0;
+		size_t similarChangesCount = 0;
+		for (size_t i = 1; i < PixelChangesBuffer.size() + 1; i++) {
+			if (i != PixelChangesBuffer.size() &&
+				PixelChangesBuffer[i - 1].EndIndex == PixelChangesBuffer[i].EndIndex)
+			{
+				similarChangesCount++;
+			}
+			else {
+				if (similarChangesCount != 0) {
+
+					PixelMoveRequest chosenMove = PixelChangesBuffer[randInt(similarChangesCount) + similarChangesIndex];
+
+					for (size_t j = 0; j < similarChangesCount; j++) {
+						PixelChangesBuffer.erase(PixelChangesBuffer.begin() + similarChangesIndex);
+					}
+					PixelChangesBuffer[similarChangesIndex] = chosenMove;
+				}
+				similarChangesIndex = i;
+				similarChangesCount = 0;
 			}
 		}
 
 		std::sort(PixelChangesBuffer.begin(), PixelChangesBuffer.end(),
-			[](auto& a, auto& b) { return a.first < b.first; }
+			[](auto& a, auto& b) { return a.Type > b.Type; }
 		);
 
 		// pick random source for each destination
 
 		size_t iprev = 0;
 
-		PixelChangesBuffer.emplace_back(-1, -1); // to catch final move
+		PixelChangesBuffer.emplace_back(PixelMoveRequest{ (size_t)-1, (size_t)-1, (size_t)-1 }); // to catch final move
 
 		for (size_t i = 0; i < PixelChangesBuffer.size() - 1; i++) {
-			if (PixelChangesBuffer[i + 1].first != PixelChangesBuffer[i].first) {
+			PixelMoveRequest currentChange = PixelChangesBuffer[i];
+			if (PixelChangesBuffer[i + 1].EndIndex != currentChange.EndIndex) {
 				size_t rand = iprev + (size_t)randInt(i - iprev);
 
-				size_t dst = PixelChangesBuffer[rand].first;
-				size_t src = PixelChangesBuffer[rand].second;
+				size_t dst = PixelChangesBuffer[rand].EndIndex;
+				size_t src = PixelChangesBuffer[rand].StartIndex;
 
-				Pixel keptPixel = Pixels[dst];
-				Pixels[dst] = Pixels[src];
-				Pixels[src] = keptPixel;
+				if (currentChange.Type == (size_t)PixelMoveTypes::SWAP &&
+					GetPixel(dst).Phase != types::SOLID_STATIC &&
+					Pixels[src].GetMass() > Pixels[dst].GetMass()
+					) {
+					Pixel keptPixel = Pixels[dst];
+					Pixels[dst] = Pixels[src];
+					Pixels[src] = keptPixel;
+				}
+				else if ((currentChange.Type == (size_t)PixelMoveTypes::FLOOD || currentChange.Type == (size_t)PixelMoveTypes::TRUEFLOOD) &&
+					(GetPixel(dst).ID == GetPixel(src).ID || GetPixel(dst).ID == types::VACUUM) &&
+					GetPixel(dst).Moles < 1 //1 is temporary, it represents moles# a pixel can hold
+					) {
+					if (currentChange.Type == (size_t)PixelMoveTypes::FLOOD) {
+						float moleAddAmount = std::min(1 - GetPixel(dst).Moles, GetPixel(src).Moles); //1 is temporary, it represents moles# a pixel can hold (again...)
+						if (GetPixel(dst).ID == types::VACUUM) {
+							Pixels[dst] = Pixels[src];
+							Pixels[src] = PixelTypes[types::VACUUM];
+						}
+						else {
+							Pixels[dst].Moles += moleAddAmount;
+							Pixels[src].Moles -= moleAddAmount;
+							if (Pixels[src].Moles == 0) {
+								Pixels[src] = PixelTypes[types::VACUUM];
+							}
+						}
+					}
+					else if (Pixels[src].Moles > 0.1) { //TRUEFLOOD
+						float moleSetAmount = 0.5 * (GetPixel(dst).Moles + GetPixel(src).Moles); //finding average
+						if (GetPixel(dst).ID == types::VACUUM) {
+							Pixels[dst] = Pixels[src];
+
+							Pixels[src].Moles = moleSetAmount;
+							Pixels[dst].Moles = moleSetAmount;
+						}
+						else {
+							Pixels[dst].Moles = moleSetAmount;
+							Pixels[src].Moles = moleSetAmount;
+						}
+					}
+				}
+				else if (currentChange.Type == (size_t)PixelMoveTypes::INJECT) {
+					Pixels[dst] = Pixels[src];
+					Pixels[dst].Moles += Pixels[src].Moles;
+					SetPixel(src, PixelTypes[types::VACUUM]);
+				}
 
 				iprev = i + 1;
 			}
@@ -160,52 +249,115 @@ namespace Pxl {
 
 	//slows down pixels
 
-	bool MoveDown(
+	bool MovePixelDirect(
 		size_t x, size_t y,
-		const Pixel& cell)
+		size_t endX, size_t endY,
+		const Pixel& cell,
+		size_t moveType
+		)
 	{
-		bool down = IsMoveableTo(x,y, x, y + 1);
-		if (down) {
-			TranslatePixel(GetIndex(x, y + 1), GetIndex(x, y));
+		bool canMove = IsMoveableTo(x,y, endX, endY, moveType);
+		if (canMove) {
+			PixelChangesBuffer.emplace_back(PixelMoveRequest{ GetIndex(x, y), GetIndex(endX, endY), moveType });
 		}
 
-		return down;
+		return canMove;
 	}
 
-	bool MoveDownSide(
-		size_t x, size_t y,
-		const Pixel& cell)
+	bool MovePixelRandom(
+		size_t x, size_t y, 
+		size_t endX1, size_t endY1,
+		size_t endX2, size_t endY2,
+		const Pixel& cell,
+		size_t moveType
+		)
 	{
-		bool downLeft = IsMoveableTo(x,y, x - 1, y + 1);
-		bool downRight = IsMoveableTo(x,y, x + 1, y + 1);
+		bool choice1 = IsMoveableTo(x,y, endX1, endY1, moveType);
+		bool choice2 = IsMoveableTo(x,y, endX2, endY2, moveType);
 
-		if (downLeft && downRight) {
-			downLeft = randInt(1)-1 == 0;
-			downRight = !downLeft;
+		if (choice1 && choice2) {
+			float Pixel1Mass = Pixels[GetIndex(endX1, endY1)].GetMass();
+			float Pixel2Mass = Pixels[GetIndex(endX2, endY2)].GetMass();
+
+			if (Pixel1Mass > Pixel2Mass) {
+				choice1 = false;
+				choice2 = true;
+			}
+			else if (Pixel1Mass < Pixel2Mass) {
+				choice1 = true;
+				choice2 = false;
+			}
+			else {
+				choice1 = randInt(1) - 1 == 0;
+				choice2 = !choice1;
+			}
 		}
 
-		if (downLeft)  TranslatePixel(GetIndex(x - 1, y + 1), GetIndex(x, y));
-		else if (downRight) TranslatePixel(GetIndex(x + 1, y + 1), GetIndex(x, y));
+		if (choice1) PixelChangesBuffer.emplace_back(PixelMoveRequest{ GetIndex(x, y), GetIndex(endX1, endY1), moveType });
+		else if (choice2) PixelChangesBuffer.emplace_back(PixelMoveRequest{ GetIndex(x, y), GetIndex(endX2, endY2), moveType });
 
-		return downLeft || downRight;
+		return choice1 || choice2;
 	}
 
-	bool MoveSide(
-		size_t x, size_t y,
-		const Pixel& cell)
-	{
-		bool left = IsMoveableTo(x,y, x - 1, y);
-		bool right = IsMoveableTo(x,y, x + 1, y);
+	void UpdatePixelsMove(size_t x, size_t y) {
+		const Pixel& currentPixel = GetPixel(x, y);
+		if (currentPixel.ID != types::VACUUM && currentPixel.Phase != types::SOLID_STATIC) {
 
-		if (left && right) {
-			left = randInt(2) - 1 > 0;
-			right = !left;
+			if (currentPixel.Phase > types::SOLID_POWDER) {
+				//FLUIDS
+				//move down
+				if (MovePixelDirect(
+					x, y,
+
+					x, y + 1,
+
+					currentPixel,
+					(size_t)PixelMoveTypes::FLOOD
+				)){}
+				//move down-sideways
+				else if (MovePixelRandom(
+					x, y,
+
+					x - 1, y + 1,
+					x + 1, y + 1,
+
+					currentPixel,
+					(size_t)PixelMoveTypes::FLOOD
+				)){}
+				//move sideways
+				else if (MovePixelRandom(
+					x, y,
+
+					x-1, y,
+					x+1, y,
+					currentPixel,
+					(size_t)PixelMoveTypes::TRUEFLOOD
+				)){}
+				if(false){}
+			}
+
+			//POWDERS
+			//move down
+			else if (MovePixelDirect(
+				x, y,
+
+				x, y + 1,
+
+				currentPixel,
+				(size_t)PixelMoveTypes::SWAP
+			)){}
+
+			//move down and sideways (for powders only)
+			else if (MovePixelRandom(
+				x, y,
+
+				x - 1, y + 1,
+				x + 1, y + 1,
+
+				currentPixel,
+				(size_t)PixelMoveTypes::SWAP
+			)){}
 		}
-
-		if (left)  TranslatePixel(GetIndex(x - 1, y), GetIndex(x, y));
-		else if (right) TranslatePixel(GetIndex(x + 1, y), GetIndex(x, y));
-
-		return left || right;
 	}
 
 	void UpdatePixels(bool isPaused, SDL_Point mPosition, SDL_Point mPositionOld, Uint32 mButton, bool mouseClick, int pxlState) {
@@ -218,12 +370,16 @@ namespace Pxl {
 					Vector2 pxlTurtle = Vector2{ (double)mPosition.x,(double)mPosition.y };
 					for (int i = 0; findGLen(mPosition, SDL_Point{ (int)pxlTurtle.x, (int)pxlTurtle.y }) <= findGLen(mPosition, mPositionOld); i++) {
 						if (!(pxlTurtle.y >= SCREEN_HEIGHT - 1 || pxlTurtle.x >= SCREEN_WIDTH - 1)) {
+
+							const size_t targetIndex = GetClosestPixel((size_t)pxlTurtle.x, (size_t)pxlTurtle.y);
 							switch (mButton) {
 							case SDL_BUTTON_LEFT:
-								SetPixel( GetClosestPixel((size_t)pxlTurtle.x, (size_t)pxlTurtle.y), selectedPixel);
+								SetPixel(targetIndex, selectedPixel);
+								Pixels[targetIndex].Moles = 1;
 								break;
 							case SDL_BUTTON_X1:
-								SetPixel(GetClosestPixel((size_t)pxlTurtle.x, (size_t)pxlTurtle.y), Pixels[types::VACUUM]);
+								SetPixel(targetIndex, PixelTypes[types::VACUUM]);
+								Pixels[targetIndex].Moles = 0;
 								break;
 							default:
 								break;
@@ -239,16 +395,9 @@ namespace Pxl {
 		//pixel updating loop
 		if (!isPaused) {
 			//gravity updates
-			for (int x = 0; x != PIXELGRID_WIDTH; x++)
-			for (int y = 0; y != PIXELGRID_HEIGHT; y++) {
-				const Pixel& currentPixel = GetPixel(x,y);
-				if (currentPixel.ID != types::VACUUM && currentPixel.Phase != types::SOLID_STATIC) {
-					if (MoveDown(x, y, currentPixel)){}
-					else if (MoveDownSide(x, y, currentPixel)) {}
-					else if (currentPixel.Phase != types::SOLID_POWDER) {
-						MoveSide(x, y, currentPixel);
-					}
-				}
+			for (int x = 0; x < PIXELGRID_WIDTH; x++)
+			for (int y = 0; y < PIXELGRID_HEIGHT; y++) {
+				UpdatePixelsMove(x, y);
 			}
 		}
 
