@@ -167,7 +167,7 @@ int main(int argc, char* args[])
         Uint32 mTicksCount = 0;
 
         //pause button's texture settings
-        SDL_Texture* pauseTexture = Gfx::loadTexture("x64/Release/Gfx/GUI/Pause.png");
+        SDL_Texture* pauseTexture = Gfx::loadTexture("Gfx/Gui/Pause/Pause.png");
         SDL_SetTextureBlendMode(pauseTexture, SDL_BLENDMODE_BLEND);
         SDL_SetTextureAlphaMod(pauseTexture, 100);
 

@@ -69,6 +69,7 @@ artifacts/
 *.pidb
 *.svclog
 *.scc
+*.gitignore
 
 # Chutzpah Test files
 _Chutzpah*
@@ -270,4 +271,6 @@ _Pvt_Extensions
 *.out
 *.app
 >>>>>>> a1e251ad19c7f2cc34d79b4e1051c85591fcd4bc
-/.gitignore
+
+#pixelsim stuffs
+PixelSim/x64/Debug/
