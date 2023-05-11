@@ -270,3 +270,4 @@ _Pvt_Extensions
 *.out
 *.app
 >>>>>>> a1e251ad19c7f2cc34d79b4e1051c85591fcd4bc
+/.gitignore
