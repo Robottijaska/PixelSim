@@ -87,7 +87,7 @@ bool init()
 
 
                     //Load the font file
-                    gFont = TTF_OpenFont("calibri.ttf", 32);
+                    gFont = TTF_OpenFont("res/calibri.ttf", 32);
                     if (gFont == NULL)
                     {
                         printf("Failed to load font! SDL_ttf Error: %s\n", TTF_GetError());
@@ -167,7 +167,7 @@ int main(int argc, char* args[])
         Uint32 mTicksCount = 0;
 
         //pause button's texture settings
-        SDL_Texture* pauseTexture = Gfx::loadTexture("Gfx/Gui/Pause/Pause.png");
+        SDL_Texture* pauseTexture = Gfx::loadTexture("res/textures/gui/pause.png");
         SDL_SetTextureBlendMode(pauseTexture, SDL_BLENDMODE_BLEND);
         SDL_SetTextureAlphaMod(pauseTexture, 100);
 

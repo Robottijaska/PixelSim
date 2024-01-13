@@ -93,7 +93,7 @@ namespace Gui {
 
 						//makes invisible
 						useTexture = true;
-						Texture = Gfx::loadTexture("Gfx/GUI/PixelPicker/Close.png");
+						Texture = Gfx::loadTexture("res/textures/gui/close.png");
 						Zone = SDL_Rect{ Parent->Parent->Zone.x + Parent->Parent->Zone.w - 7 * 4, Parent->Parent->Zone.y, 7 * 4, 7 * 4 };
 					}
 
@@ -363,7 +363,7 @@ namespace Gui {
 					Buttons.push_back(std::make_unique<ClearAllButton>(this));
 
 					useTexture = true;
-					Texture = Gfx::loadTexture("Gfx/GUI/Menu/Menu.png");
+					Texture = Gfx::loadTexture("res/textures/gui/menu.png");
 				}
 
 				~MainScreen() {
