@@ -1,2 +1,0 @@
-C:\ProgrammingStuff\PixelSim\x64\Release\PixelSim.exe
-C:\Users\Carson\source\repos\Robottijaska\PixelSim\PixelSim\x64\Release\PixelSim.exe
